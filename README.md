@@ -1,5 +1,9 @@
 # pySigma InsightIDR Backend
 
+![Tests](https://github.com/SigmaHQ/pySigma-backend-insightidr/actions/workflows/test.yml/badge.svg)
+![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/thomaspatzke/059a8e802ddcf72bcc92fa60a613a8ac/raw/SigmaHQ-pySigma-backend-insightidr.json)
+![Status](https://img.shields.io/badge/Status-pre--release-orange)
+
 ## Overview
 This is the Rapid7 [InsightIDR](https://www.rapid7.com/products/insightidr/) backend for [pySigma](https://github.com/SigmaHQ/pySigma), capable of converting Sigma rules into [Log Entry Query Language (LEQL)](https://docs.rapid7.com/insightidr/use-a-search-language) queries compatible with the InsightIDR SIEM. It provides the package `sigma.backends.insight_idr` with the `InsightIDRBackend` class.
 Further, it contains the processing pipeline `sigma.pipelines.insight_idr`, which performs field mapping and error handling.
@@ -14,15 +18,15 @@ The InsightIDR backend supports the following log entry/rule types:
 ## Output Format Support
 It supports the following output formats which can be used for log search, custom alerts, dashboards, and reporting:
 
-* **default**: queries output in the InsightIDR "Simple" format* 
+* **default**: queries output in the InsightIDR "Simple" format*
 * **leql_advanced_search**: queries in the "Advanced" format**
 * **leql_detection_definition**: queries matching the LEQL detection rule logic format roughly matching what is shown in the InsightIDR Detection Rules -> Detection Rule -> Rule Logic screen***
 
-*Ideal for use in custom alerts.  
-**Ideal for use with [InsightIDR4Py](https://github.com/mbabinski/InsightIDR4Py), a module offering streamlined access to the Rapid7 LogSearch API.  
-***Conceptual only - these queries are not usable within the InsightIDR interfaces mentioned above.  
+*Ideal for use in custom alerts.
+**Ideal for use with [InsightIDR4Py](https://github.com/mbabinski/InsightIDR4Py), a module offering streamlined access to the Rapid7 LogSearch API.
+***Conceptual only - these queries are not usable within the InsightIDR interfaces mentioned above.
 
-Sigma rules using the Sigma endswith modifier uses a regular expression for pattern matching, as LEQL contains no IENDS-WITH or IENDS-WITH-ANY modifier. 
+Sigma rules using the Sigma endswith modifier uses a regular expression for pattern matching, as LEQL contains no IENDS-WITH or IENDS-WITH-ANY modifier.
 
 ## Usage example
 The following example script demonstrates how you can use the InsightIDR backend to generate advanced LEQL queries for the following Sigma rules:
@@ -43,7 +47,7 @@ insight_idr_backend = insight_idr.InsightIDRBackend(idr_pipeline)
 process_start_rules = [r"C:\SigmaRules\rules\windows\process_creation\proc_creation_win_webshell_detection.yml",
                        r"C:\SigmaRules\rules\windows\process_creation\proc_creation_win_cmd_delete.yml",
                        r"C:\SigmaRules\rules\windows\process_creation\proc_creation_win_susp_rundll32_activity.yml"]
-					   
+
 process_start_rule_collection = SigmaCollection.load_ruleset(process_start_rules)
 
 # convert the rules
