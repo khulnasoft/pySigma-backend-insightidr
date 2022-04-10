@@ -298,3 +298,9 @@ class InsightIDRBackend(TextQueryBackend):
 where(
   {formatted_query}
 )"""
+
+    def finalize_output_leql_advanced_search(self, queries: List[str]) -> List[str]:
+        return self.finalize_output_default(queries)
+
+    def finalize_output_leql_detection_definition(self, queries: List[str]) -> List[str]:
+        return self.finalize_output_default(queries)
