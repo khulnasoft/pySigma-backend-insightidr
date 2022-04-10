@@ -96,12 +96,12 @@ def test_insight_idr_value_eq_or_query(insight_idr_backend : InsightIDRBackend):
                     product: test_product
                 detection:
                     selection:
-                        field: val1
+                        field1: val1
                     selection2:
-                        field: val2
+                        field2: val2
                     condition: selection or selection2
             """)
-        ) == ['field = NOCASE("val1") OR field = NOCASE("val2")']
+        ) == ['field1 = NOCASE("val1") OR field2 = NOCASE("val2")']
 
 def test_insight_idr_value_eq_and_query(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(

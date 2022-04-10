@@ -3,7 +3,7 @@ from sigma.types import re, SigmaString
 from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
 from sigma.conversion.deferred import DeferredQueryExpression, DeferredTextQueryExpression
-from sigma.conditions import ConditionFieldEqualsValueExpression, ConditionOR, ConditionAND, ConditionFieldValueInExpression
+from sigma.conditions import ConditionFieldEqualsValueExpression, ConditionOR, ConditionAND
 from sigma.types import SigmaCompareExpression
 from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
 from typing import ClassVar, Dict, List, Tuple, Union
@@ -104,7 +104,7 @@ class InsightIDRBackend(TextQueryBackend):
                 if converted is not None and not isinstance(converted, DeferredQueryExpression)
             ))
         return result
-        
+
 
     def convert_condition_field_eq_val_str(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of field = string value expressions"""
@@ -136,20 +136,6 @@ class InsightIDRBackend(TextQueryBackend):
             field=cond.field,
             regex=cond.value.regexp
         )
-    
-
-    def convert_condition_field_in_vals(self, cond : ConditionFieldValueInExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        """Conversion of field in value list conditions."""
-        result = self.field_in_list_expression.format(
-            field=cond.field,
-            list=self.list_separator.join([
-                self.get_quote_type(self.convert_value_str(v, state)) + v.to_plain() + self.get_quote_type(self.convert_value_str(v, state)) if isinstance(v, SigmaString)   # string escaping and qouting
-                else str(v)       # value is number
-                for v in cond.value
-            ]),
-        )
-
-        return result
 
 
     def convert_icontains_any(self, field, values):
@@ -202,21 +188,32 @@ class InsightIDRBackend(TextQueryBackend):
                 vals = [str(arg.value.to_plain() or "") for arg in cond.args]
                 vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]
                 fields = list(set([arg.field for arg in cond.args]))
-                # icontains-any
-                if len(fields) == 1 and vals[0].startswith(self.wildcard_single) and vals[0].endswith(self.wildcard_single):
-                    result = self.convert_icontains_any(fields[0], vals_no_wc)
-                    return result
-                # startswith-any
-                elif len(fields) == 1 and vals[0].endswith(self.wildcard_single) and not vals[0].startswith(self.wildcard_single):
-                    result = self.convert_istarts_with_any(fields[0], vals_no_wc)
-                    return result
-                # endswith-any
-                elif len(fields) == 1 and vals[0].startswith(self.wildcard_single) and not vals[0].endswith(self.wildcard_single):
-                    field = fields[0]
-                    escaped_vals = [re.escape(val).replace("/", "\\/") for val in vals_no_wc]
-                    exp = "(.*{}$)".format("$|.*".join(escaped_vals))
-                    result = self.re_expression.format(field=field, regex=exp)
-                    return result
+                if len(fields) == 1:    # only one field name across all ORed items.
+                    # icontains-any
+                    if vals[0].startswith(self.wildcard_single) and vals[0].endswith(self.wildcard_single):
+                        result = self.convert_icontains_any(fields[0], vals_no_wc)
+                        return result
+                    # startswith-any
+                    elif vals[0].endswith(self.wildcard_single) and not vals[0].startswith(self.wildcard_single):
+                        result = self.convert_istarts_with_any(fields[0], vals_no_wc)
+                        return result
+                    # endswith-any
+                    elif vals[0].startswith(self.wildcard_single) and not vals[0].endswith(self.wildcard_single):
+                        field = fields[0]
+                        escaped_vals = [re.escape(val).replace("/", "\\/") for val in vals_no_wc]
+                        exp = "(.*{}$)".format("$|.*".join(escaped_vals))
+                        result = self.re_expression.format(field=field, regex=exp)
+                        return result
+                    else:
+                        return self.field_in_list_expression.format(
+                            field=fields[0],
+                            list=self.list_separator.join([
+                                self.get_quote_type(self.convert_value_str(arg.value, state)) + arg.value.to_plain() + self.get_quote_type(self.convert_value_str(arg.value, state))
+                                if isinstance(arg.value, SigmaString)   # string escaping and qouting
+                                else str(arg.value)       # value is number
+                                for arg in cond.args
+                            ]),
+                        )
                 else:
                     # 'OR' fields differ
                     return self.basic_join_or(cond, state)
@@ -257,10 +254,10 @@ class InsightIDRBackend(TextQueryBackend):
             # args have different modifiers
             else:
                 return self.basic_join_and(cond, state)
-        # child args are other 'OR' or 'AND' expressions   
+        # child args are other 'OR' or 'AND' expressions
         else:
             return self.basic_join_and(cond, state)
-        
+
     def finalize_query(self, rule : SigmaRule, query : Union[str, DeferredQueryExpression], index : int, state : ConversionState, output_format : str) -> Union[str, DeferredQueryExpression]:
         """
         Finalize query by appending deferred query parts to the main conversion result as specified
