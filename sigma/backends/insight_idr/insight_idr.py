@@ -105,6 +105,11 @@ class InsightIDRBackend(TextQueryBackend):
             ))
         return result
 
+    def keyword_join_or(self, cond, state):
+        pass
+
+    def keyword_join_and(self, cond, state):
+        pass
 
     def convert_condition_field_eq_val_str(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of field = string value expressions"""
@@ -129,14 +134,12 @@ class InsightIDRBackend(TextQueryBackend):
 
         return result
 
-
     def convert_condition_field_eq_val_re(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of field matches regular expression value expressions."""
         return self.re_expression.format(
             field=cond.field,
             regex=cond.value.regexp
         )
-
 
     def convert_icontains_any(self, field, values):
         """Conversion of field contains any in list conditions."""
@@ -150,7 +153,6 @@ class InsightIDRBackend(TextQueryBackend):
 
         return result
 
-
     def convert_icontains_all(self, field, values):
         """Conversion of field contains all in list conditions."""
         result = self.field_icontains_all_expression.format(field=field,
@@ -162,7 +164,6 @@ class InsightIDRBackend(TextQueryBackend):
                                                             )
 
         return result
-
 
     def convert_istarts_with_any(self, field, values):
         """Conversion of field starts with any in list conditions."""
@@ -176,15 +177,14 @@ class InsightIDRBackend(TextQueryBackend):
 
         return result
 
-
     def convert_condition_or(self, cond : ConditionOR, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of OR conditions."""
         # child args all contain values
         if all(["value" in vars(arg).keys() for arg in cond.args]):
             args = cond.args
             mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
-            # check whether all args have the same modifiers
-            if all(mod == mods[0] for mod in mods):
+            # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
+            if all(mod == mods[0] for mod in mods) and all(["field" in vars(arg).keys() for arg in cond.args]):
                 vals = [str(arg.value.to_plain() or "") for arg in cond.args]
                 vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]
                 fields = list(set([arg.field for arg in cond.args]))
@@ -224,15 +224,14 @@ class InsightIDRBackend(TextQueryBackend):
         else:
             return self.basic_join_or(cond, state)
 
-
     def convert_condition_and(self, cond : ConditionAND, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of AND conditions."""
         # child args all contain values
         if all(["value" in vars(arg).keys() for arg in cond.args]):
             args = cond.args
             mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
-            # check whether all args have the same modifiers
-            if all(mod == mods[0] for mod in mods):
+            # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
+            if all(mod == mods[0] for mod in mods) and all(["field" in vars(arg).keys() for arg in cond.args]):
                 vals = [str(arg.value.to_plain() or "") for arg in cond.args]
                 vals = [arg.value.to_plain() or "" for arg in cond.args]
                 vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]

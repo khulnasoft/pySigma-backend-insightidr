@@ -117,7 +117,7 @@ def test_insight_idr_keyword_or_query(insight_idr_backend : InsightIDRBackend):
                         - val2
                     condition: selection
             """)
-        ) == ['NOCASE("val1") OR NOCASE("val2")']
+        ) == ['"val1" OR "val2"']
 
 def test_insight_idr_keyword_and_query(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(
@@ -134,7 +134,7 @@ def test_insight_idr_keyword_and_query(insight_idr_backend : InsightIDRBackend):
                         - val2
                     condition: selection1 and selection2
             """)
-        ) == ['NOCASE("val1") AND NOCASE("val2")']
+        ) == ['"val1" AND "val2"']
 
 def test_insight_idr_value_eq_and_query(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(
