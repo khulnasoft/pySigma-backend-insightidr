@@ -103,6 +103,39 @@ def test_insight_idr_value_eq_or_query(insight_idr_backend : InsightIDRBackend):
             """)
         ) == ['field1 = NOCASE("val1") OR field2 = NOCASE("val2")']
 
+def test_insight_idr_keyword_or_query(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: test_category
+                    product: test_product
+                detection:
+                    selection:
+                        - val1
+                        - val2
+                    condition: selection
+            """)
+        ) == ['NOCASE("val1") OR NOCASE("val2")']
+
+def test_insight_idr_keyword_and_query(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: test_category
+                    product: test_product
+                detection:
+                    selection1:
+                        - val1
+                    selection2:
+                        - val2
+                    condition: selection1 and selection2
+            """)
+        ) == ['NOCASE("val1") AND NOCASE("val2")']
+
 def test_insight_idr_value_eq_and_query(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(
             SigmaCollection.from_yaml("""
