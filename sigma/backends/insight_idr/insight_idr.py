@@ -233,7 +233,6 @@ class InsightIDRBackend(TextQueryBackend):
             # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
             if all(mod == mods[0] for mod in mods) and all(["field" in vars(arg).keys() for arg in cond.args]):
                 vals = [str(arg.value.to_plain() or "") for arg in cond.args]
-                vals = [arg.value.to_plain() or "" for arg in cond.args]
                 vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]
                 fields = list(set([arg.field for arg in cond.args]))
                 # parent condition has modifiers
