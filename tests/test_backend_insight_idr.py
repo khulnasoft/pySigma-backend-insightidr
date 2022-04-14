@@ -1,6 +1,5 @@
 import pytest
 from sigma.collection import SigmaCollection
-from sigma.pipelines.insight_idr import insight_idr_pipeline
 from sigma.backends.insight_idr import InsightIDRBackend
 
 @pytest.fixture
@@ -13,8 +12,8 @@ def test_insight_idr_simple_eq_nocase_query(insight_idr_backend : InsightIDRBack
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field: foo
@@ -22,14 +21,31 @@ def test_insight_idr_simple_eq_nocase_query(insight_idr_backend : InsightIDRBack
             """)
         ) == ['field = NOCASE("foo")']
 
+def test_insight_idr_not_condition_query(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: process_creation
+                    product: windows
+                detection:
+                    selection:
+                        field: foo
+                    filter:
+                        field: blah 
+                    condition: selection and not filter
+            """)
+        ) == ['field = NOCASE("foo") AND NOT field = NOCASE("blah")']
+
 def test_insight_idr_simple_contains_query(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(
             SigmaCollection.from_yaml("""
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|contains: foo
@@ -43,8 +59,8 @@ def test_insight_idr_simple_startswith_query(insight_idr_backend : InsightIDRBac
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|startswith: foo
@@ -58,8 +74,8 @@ def test_insight_idr_simple_endswith_query(insight_idr_backend : InsightIDRBacke
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|endswith: foo
@@ -73,8 +89,8 @@ def test_insight_idr_value_in_list_query(insight_idr_backend : InsightIDRBackend
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field:
@@ -92,8 +108,8 @@ def test_insight_idr_value_eq_or_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field1: val1
@@ -109,8 +125,8 @@ def test_insight_idr_keyword_or_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         - val1
@@ -125,8 +141,8 @@ def test_insight_idr_keyword_and_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection1:
                         - val1
@@ -142,8 +158,8 @@ def test_insight_idr_value_eq_and_query(insight_idr_backend : InsightIDRBackend)
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field: val1
@@ -159,8 +175,8 @@ def test_insight_idr_contains_any_query(insight_idr_backend : InsightIDRBackend)
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|contains:
@@ -177,8 +193,8 @@ def test_insight_idr_contains_all_query(insight_idr_backend : InsightIDRBackend)
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|contains|all:
@@ -195,8 +211,8 @@ def test_insight_idr_startswith_any_query(insight_idr_backend : InsightIDRBacken
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|startswith:
@@ -213,8 +229,8 @@ def test_insight_idr_endswith_any_query(insight_idr_backend : InsightIDRBackend)
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|endswith:
@@ -231,8 +247,8 @@ def test_insight_idr_re_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|re: boo.*far
@@ -246,8 +262,8 @@ def test_insight_idr_cidr_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|cidr: 192.168.0.0/16
@@ -261,8 +277,8 @@ def test_insight_idr_base64_query(insight_idr_backend : InsightIDRBackend):
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     selection:
                         field|base64: 'sigma rules!'
@@ -276,8 +292,8 @@ def test_insight_idr_condition_nested_logic(insight_idr_backend : InsightIDRBack
                 title: Test
                 status: test
                 logsource:
-                    category: test_category
-                    product: test_product
+                    category: process_creation
+                    product: windows
                 detection:
                     sel1:
                         field|contains:
@@ -292,3 +308,26 @@ def test_insight_idr_condition_nested_logic(insight_idr_backend : InsightIDRBack
                     condition: sel1 or (sel2a and sel2b)
             """)
         ) == ['field ICONTAINS-ANY ["val1", "val2"] OR field=/.*val3$/i AND field ICONTAINS "val4"']
+
+def test_insight_idr_not_1_of_filter_condition(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: process_creation
+                    product: windows
+                detection:
+                    selection:
+                        field|contains|all:
+                            - val1
+                            - val2
+                    filter1:
+                        field1|contains:
+                            - val3
+                    filter2:
+                        field2|contains:
+                            - val4
+                    condition: selection and not 1 of filter*
+            """)
+        ) == ['field ICONTAINS-ALL ["val1", "val2"] AND NOT (field1 ICONTAINS "val3" OR field2 ICONTAINS "val4")']
