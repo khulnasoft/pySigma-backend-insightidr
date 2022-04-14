@@ -1,7 +1,9 @@
 from sigma.conversion.state import ConversionState
-from sigma.types import re, SigmaString
+from sigma.types import re, SigmaString, SigmaNumber
 from sigma.rule import SigmaRule
 from sigma.conversion.base import TextQueryBackend
+from sigma.processing.pipeline import ProcessingPipeline
+from sigma.pipelines.insight_idr import insight_idr_pipeline
 from sigma.conversion.deferred import DeferredQueryExpression, DeferredTextQueryExpression
 from sigma.conditions import ConditionFieldEqualsValueExpression, ConditionOR, ConditionAND
 from sigma.types import SigmaCompareExpression
@@ -10,6 +12,7 @@ from typing import ClassVar, Dict, List, Tuple, Union
 
 class InsightIDRBackend(TextQueryBackend):
     """InsightIDR LEQL backend."""
+    backend_processing_pipeline : ClassVar[ProcessingPipeline] = insight_idr_pipeline()
     group_expression : ClassVar[str] = "({expr})"
 
     or_token : ClassVar[str] = "OR"
@@ -26,7 +29,7 @@ class InsightIDRBackend(TextQueryBackend):
 
     str_quote : ClassVar[str] = '"'
     str_single_quote : ClassVar[str] = "'"
-    str_triple_quote = '"""'
+    str_triple_quote : ClassVar[str] = '"""'
     escape_char : ClassVar[str] = "\\"
     wildcard_multi : ClassVar[str] = "*"
     wildcard_single : ClassVar[str] = "*"
@@ -179,8 +182,8 @@ class InsightIDRBackend(TextQueryBackend):
 
     def convert_condition_or(self, cond : ConditionOR, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of OR conditions."""
-        # child args all contain values
-        if all(["value" in vars(arg).keys() for arg in cond.args]):
+        # child args all contain values that are strings or numbers
+        if all(["value" in vars(arg).keys() for arg in cond.args]) and all([isinstance(arg.value, (SigmaString, SigmaNumber)) for arg in cond.args]):
             args = cond.args
             mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
             # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
@@ -227,7 +230,7 @@ class InsightIDRBackend(TextQueryBackend):
     def convert_condition_and(self, cond : ConditionAND, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of AND conditions."""
         # child args all contain values
-        if all(["value" in vars(arg).keys() for arg in cond.args]):
+        if all(["value" in vars(arg).keys() for arg in cond.args]) and all([isinstance(arg.value, (SigmaString, SigmaNumber)) for arg in cond.args]):
             args = cond.args
             mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
             # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
@@ -255,32 +258,6 @@ class InsightIDRBackend(TextQueryBackend):
         # child args are other 'OR' or 'AND' expressions
         else:
             return self.basic_join_and(cond, state)
-
-    def finalize_query(self, rule : SigmaRule, query : Union[str, DeferredQueryExpression], index : int, state : ConversionState, output_format : str) -> Union[str, DeferredQueryExpression]:
-        """
-        Finalize query by appending deferred query parts to the main conversion result as specified
-        with deferred_start and deferred_separator.
-        """
-        # addition of a check for aggregate functions
-        agg_function_strings = ["| count", "| min", "| max", "| avg", "| sum"]
-        condition_string = " ".join([item.lower() for item in rule.detection.condition])
-        if any(f in condition_string for f in agg_function_strings):
-            raise SigmaFeatureNotSupportedByBackendError("Aggregate functions are deprecated and are not supported by the InsightIDR backend.", source=rule.detection.condition)
-
-        # finalize
-        if state.has_deferred():
-            if isinstance(query, DeferredQueryExpression):
-                query = self.deferred_only_query
-            return super().finalize_query(rule,
-                query + self.deferred_start + self.deferred_separator.join((
-                    deferred_expression.finalize_expression()
-                    for deferred_expression in state.deferred
-                    )
-                ),
-                index, state, output_format
-            )
-        else:
-            return super().finalize_query(rule, query, index, state, output_format)
 
     # finalize query for use with log search 'Advanced' option
     def finalize_query_leql_advanced_search(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:
