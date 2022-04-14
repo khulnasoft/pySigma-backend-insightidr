@@ -1,7 +1,8 @@
-from sigma.processing.conditions import IncludeFieldCondition, MatchStringCondition, LogsourceCondition, RuleProcessingItemAppliedCondition
+from sigma.processing.conditions import IncludeFieldCondition, MatchStringCondition, LogsourceCondition, RuleProcessingItemAppliedCondition, RuleProcessingCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import ChangeLogsourceTransformation, RuleFailureTransformation, DetectionItemFailureTransformation, FieldMappingTransformation
 from sigma.pipelines.common import logsource_windows_network_connection,logsource_windows_network_connection_initiated, logsource_windows_process_creation, logsource_windows_dns_query
+from sigma.rule import SigmaRule
 
 def logsource_generic_dns_query() -> LogsourceCondition:
     return LogsourceCondition(
@@ -17,6 +18,17 @@ def logsource_firewall() -> LogsourceCondition:
     return LogsourceCondition(
         category="firewall"
     )
+
+class AggregateRuleProcessingCondition(RuleProcessingCondition):
+    """"""
+    def match(self, pipeline : "sigma.processing.pipeline.ProcessingPipeline", rule : SigmaRule) -> bool:
+        """Match condition on Sigma rule."""
+        agg_function_strings = ["| count", "| min", "| max", "| avg", "| sum", "| near"]
+        condition_string = " ".join([item.lower() for item in rule.detection.condition])
+        if any(f in condition_string for f in agg_function_strings):
+            return True
+        else:
+            return False
 
 
 def insight_idr_pipeline():
@@ -62,6 +74,7 @@ def insight_idr_pipeline():
                             "CurrentDirectory",
                             "IntegrityLevel",
                             "imphash",
+                            "Imphash",
                             "LogonId"
                         ]
                     )
@@ -82,19 +95,22 @@ def insight_idr_pipeline():
             # DNS Request field mapping
             ProcessingItem(
                 identifier="insight_idr_dns_query_fieldmapping",
+                rule_condition_linking=any,
                 transformation=FieldMappingTransformation({
                     "QueryName": "query",
-                    "Computer": "asset"
+                    "Computer": "asset",
+                    "record_type": "query_type"
                 }),
                 rule_conditions=[
                     logsource_windows_dns_query(),
+                    logsource_generic_dns_query()
                 ]
             ),
             # Handle unsupported DNS query fields
             ProcessingItem(
                 identifier="insight_idr_fail_dns_fields",
                 rule_condition_linking=any,
-                transformation=DetectionItemFailureTransformation("The InsightIDR backend does not support the ProcessID, QueryStatus, QueryResults, or Image fields for DNS events."),
+                transformation=DetectionItemFailureTransformation("The InsightIDR backend does not support the ProcessID, QueryStatus, QueryResults, Image, or answer fields for DNS events."),
                 rule_conditions=[
                     logsource_windows_dns_query(),
                     logsource_generic_dns_query()
@@ -105,7 +121,8 @@ def insight_idr_pipeline():
                             "ProcessId",
                             "QueryStatus",
                             "QueryResults",
-                            "Image"
+                            "Image",
+                            "answer"
                         ]
                     )
                 ]
@@ -199,6 +216,15 @@ def insight_idr_pipeline():
                     RuleProcessingItemAppliedCondition("insight_idr_web_proxy_logsource"),
                     RuleProcessingItemAppliedCondition("insight_idr_process_start_logsource"),
                     RuleProcessingItemAppliedCondition("insight_idr_dns_query_logsource")
+                ],
+            ),
+
+            # Handle rules that use aggregate functions
+            ProcessingItem(
+                identifier="insight_idr_fail_rule_conditions_not_supported",
+                transformation=RuleFailureTransformation("Rules with aggregate function conditions like count, min, max, avg, sum, and near are not supported by the InsightIDR Sigma backend!"),
+                rule_conditions=[
+                    AggregateRuleProcessingCondition()
                 ],
             )
         ]
