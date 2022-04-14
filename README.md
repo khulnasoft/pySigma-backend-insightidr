@@ -6,7 +6,7 @@
 
 ## Overview
 This is the Rapid7 [InsightIDR](https://www.rapid7.com/products/insightidr/) backend for [pySigma](https://github.com/SigmaHQ/pySigma), capable of converting Sigma rules into [Log Entry Query Language (LEQL)](https://docs.rapid7.com/insightidr/use-a-search-language) queries compatible with the InsightIDR SIEM. It provides the package `sigma.backends.insight_idr` with the `InsightIDRBackend` class.
-Further, it contains the processing pipeline `sigma.pipelines.insight_idr`, which performs field mapping and error handling.
+Further, it contains the processing pipeline `sigma.pipelines.insight_idr`, which performs field mapping and error handling. The InsightIDR pipeline is the automatic/default processing pipeline for the InsightIDR backend.
 
 ## Rule Support
 The InsightIDR backend supports the following log entry/rule types:
@@ -22,9 +22,9 @@ It supports the following output formats which can be used for log search, custo
 * **leql_advanced_search**: queries in the "Advanced" format**
 * **leql_detection_definition**: queries matching the LEQL detection rule logic format roughly matching what is shown in the InsightIDR Detection Rules -> Detection Rule -> Rule Logic screen***
 
-*Ideal for use in custom alerts.
-**Ideal for use with [InsightIDR4Py](https://github.com/mbabinski/InsightIDR4Py), a module offering streamlined access to the Rapid7 LogSearch API.
-***Conceptual only - these queries are not usable within the InsightIDR interfaces mentioned above.
+\*Ideal for use in custom alerts.  
+\*\*Ideal for use with [InsightIDR4Py](https://github.com/mbabinski/InsightIDR4Py), a module offering streamlined access to the Rapid7 LogSearch API.  
+\*\*\*Conceptual only - these queries are not usable within the InsightIDR interfaces mentioned above.  
 
 Sigma rules using the Sigma endswith modifier uses a regular expression for pattern matching, as LEQL contains no IENDS-WITH or IENDS-WITH-ANY modifier.
 
@@ -36,12 +36,10 @@ The following example script demonstrates how you can use the InsightIDR backend
 ```python
 # demonstrates basic usage of InsightIDR backend
 from sigma.collection import SigmaCollection
-from sigma.pipelines.insight_idr import insight_idr_pipeline
 from sigma.backends.insight_idr import insight_idr
 
 # create pipeline and backend
-idr_pipeline = insight_idr_pipeline()
-insight_idr_backend = insight_idr.InsightIDRBackend(idr_pipeline)
+insight_idr_backend = insight_idr.InsightIDRBackend()
 
 # load a ruleset
 process_start_rules = [r"C:\SigmaRules\rules\windows\process_creation\proc_creation_win_webshell_detection.yml",
@@ -64,7 +62,6 @@ where((parent_process.exe_path=/(.*\\w3wp\.exe$|.*\\php\-cgi\.exe$|.*\\nginx\.ex
 
 Windows Cmd Delete File conversion:
 where(process.cmd_line ICONTAINS-ALL ["del ", "/f"] OR process.cmd_line ICONTAINS-ALL ["rmdir", "/s", "/q"])
-
 
 Suspicious Rundll32 Activity conversion:
 where(process.cmd_line ICONTAINS-ALL ["javascript:", ".RegisterXLL"] OR process.cmd_line ICONTAINS-ALL ["url.dll", "OpenURL"] OR process.cmd_line ICONTAINS-ALL ["url.dll", "OpenURLA"] OR process.cmd_line ICONTAINS-ALL ["url.dll", "FileProtocolHandler"] OR process.cmd_line ICONTAINS-ALL ["zipfldr.dll", "RouteTheCall"] OR process.cmd_line ICONTAINS-ALL ["shell32.dll", "Control_RunDLL"] OR process.cmd_line ICONTAINS-ALL ["shell32.dll", "ShellExec_RunDLL"] OR process.cmd_line ICONTAINS-ALL ["mshtml.dll", "PrintHTML"] OR process.cmd_line ICONTAINS-ALL ["advpack.dll", "LaunchINFSection"] OR process.cmd_line ICONTAINS-ALL ["advpack.dll", "RegisterOCX"] OR process.cmd_line ICONTAINS-ALL ["ieadvpack.dll", "LaunchINFSection"] OR process.cmd_line ICONTAINS-ALL ["ieadvpack.dll", "RegisterOCX"] OR process.cmd_line ICONTAINS-ALL ["ieframe.dll", "OpenURL"] OR process.cmd_line ICONTAINS-ALL ["shdocvw.dll", "OpenURL"] OR process.cmd_line ICONTAINS-ALL ["syssetup.dll", "SetupInfObjectInstallAction"] OR process.cmd_line ICONTAINS-ALL ["setupapi.dll", "InstallHinfSection"] OR process.cmd_line ICONTAINS-ALL ["pcwutl.dll", "LaunchApplication"] OR process.cmd_line ICONTAINS-ALL ["dfshim.dll", "ShOpenVerbApplication"])
