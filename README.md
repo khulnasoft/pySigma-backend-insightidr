@@ -8,6 +8,9 @@
 This is the Rapid7 [InsightIDR](https://www.rapid7.com/products/insightidr/) backend for [pySigma](https://github.com/SigmaHQ/pySigma), capable of converting Sigma rules into [Log Entry Query Language (LEQL)](https://docs.rapid7.com/insightidr/use-a-search-language) queries compatible with the InsightIDR SIEM. It provides the package `sigma.backends.insight_idr` with the `InsightIDRBackend` class.
 Further, it contains the processing pipeline `sigma.pipelines.insight_idr`, which performs field mapping and error handling. The InsightIDR pipeline is the automatic/default processing pipeline for the InsightIDR backend.
 
+## Installation
+The pySigma InsightIDR Backend is available on Python Package Index (PyPI) here: https://pypi.org/project/pysigma-backend-insightidr/. It can be installed using pip with the command: `pip install pysigma-backend-insightidr`.
+
 ## Rule Support
 The InsightIDR backend supports the following log entry/rule types:
 
@@ -29,6 +32,12 @@ It supports the following output formats which can be used for log search, custo
 Sigma rules using the Sigma endswith modifier uses a regular expression for pattern matching, as LEQL contains no IENDS-WITH or IENDS-WITH-ANY modifier.
 
 ## Usage example
+
+### Sigma CLI
+You can quickly convert a single rule or rules in a directory structure using Sigma CLI. You can use:
+`sigma convert -t insightidr -f leql_advanced_search -s ~/sigma/rules` where -t is the target query language, -f is the desired output format, and -s is the Sigma rule or rules directory you wish to convert.
+
+### Stand-alone Script
 The following example script demonstrates how you can use the InsightIDR backend to generate advanced LEQL queries for the following Sigma rules:
 * [Webshell Detection With Command Line Keywords](https://github.com/SigmaHQ/sigma/blob/master/rules/windows/process_creation/proc_creation_win_webshell_detection.yml)
 * [Windows Cmd Delete File](https://github.com/SigmaHQ/sigma/blob/master/rules/windows/process_creation/proc_creation_win_cmd_delete.yml)
