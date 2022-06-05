@@ -82,7 +82,7 @@ class InsightIDRBackend(TextQueryBackend):
         result = joiner.join((
                 converted
                 for converted in (
-                    self.convert_condition(arg, state) if self.compare_precedence(ConditionOR, arg.__class__)
+                    self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
                     else self.convert_condition_group(arg, state)
                     for arg in cond.args
                 )
@@ -100,7 +100,7 @@ class InsightIDRBackend(TextQueryBackend):
         result = joiner.join((
                 converted
                 for converted in (
-                    self.convert_condition(arg, state) if self.compare_precedence(ConditionAND, arg.__class__)
+                    self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
                     else self.convert_condition_group(arg, state)
                     for arg in cond.args
                 )
