@@ -7,12 +7,17 @@ from sigma.pipelines.insight_idr import insight_idr_pipeline
 from sigma.conversion.deferred import DeferredQueryExpression, DeferredTextQueryExpression
 from sigma.conditions import ConditionFieldEqualsValueExpression, ConditionOR, ConditionAND
 from sigma.types import SigmaCompareExpression
-from sigma.exceptions import SigmaFeatureNotSupportedByBackendError
-from typing import ClassVar, Dict, List, Tuple, Union
+from typing import Union, ClassVar, Optional, Tuple, List, Dict, Any
 
 class InsightIDRBackend(TextQueryBackend):
     """InsightIDR LEQL backend."""
     backend_processing_pipeline : ClassVar[ProcessingPipeline] = insight_idr_pipeline()
+
+    # in-expressions
+    convert_or_as_in : ClassVar[bool] = True                     # Convert OR as in-expression
+    convert_and_as_in : ClassVar[bool] = True                    # Convert AND as in-expression
+    in_expressions_allow_wildcards : ClassVar[bool] = True       # Values in list can contain wildcards. If set to False (default) only plain values are converted into in-expressions.
+    
     group_expression : ClassVar[str] = "({expr})"
 
     or_token : ClassVar[str] = "OR"
@@ -21,11 +26,7 @@ class InsightIDRBackend(TextQueryBackend):
     eq_token : ClassVar[str] = "="
 
     icontains_token: ClassVar[str] = "ICONTAINS"
-    icontains_any_token: ClassVar[str] = "ICONTAINS-ANY"
-    icontains_all_token: ClassVar[str] = "ICONTAINS-ALL"
-
     istarts_with_token: ClassVar[str] = "ISTARTS-WITH"
-    istarts_with_any_token: ClassVar[str] = "ISTARTS-WITH-ANY"
 
     str_quote : ClassVar[str] = '"'
     str_single_quote : ClassVar[str] = "'"
@@ -49,11 +50,11 @@ class InsightIDRBackend(TextQueryBackend):
     }
 
     field_null_expression : ClassVar[str] = "{field} = null"
-
+    
     field_in_list_expression : ClassVar[str] = "{field} IIN [{list}]"
-    field_icontains_any_expression : ClassVar[str] = "{field} ICONTAINS-ANY [{list}]"
-    field_icontains_all_expression : ClassVar[str] = "{field} ICONTAINS-ALL [{list}]"
-    field_istarts_with_any_expression : ClassVar[str] = "{field} ISTARTS-WITH-ANY [{list}]"
+    icontains_any_expression : ClassVar[Optional[str]] = "{field} ICONTAINS-ANY [{list}]"
+    icontains_all_expression : ClassVar[Optional[str]] = "{field} ICONTAINS-ALL [{list}]"
+    istartswith_any_expression : ClassVar[Optional[str]] = "{field} ISTARTS-WITH-ANY [{list}]"
     list_separator : ClassVar[str] = ", "
 
     unbound_value_str_expression : ClassVar[str] = '"{value}"'
@@ -72,53 +73,11 @@ class InsightIDRBackend(TextQueryBackend):
 
         return quote
 
-    def basic_join_or(self, cond, state):
-        """Default conversion of OR conditions"""
-        if self.token_separator == self.or_token:   # don't repeat the same thing triple times if separator equals or token
-            joiner = self.or_token
-        else:
-            joiner = self.token_separator + self.or_token + self.token_separator
-
-        result = joiner.join((
-                converted
-                for converted in (
-                    self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
-                    else self.convert_condition_group(arg, state)
-                    for arg in cond.args
-                )
-                if converted is not None and not isinstance(converted, DeferredQueryExpression)
-            ))
-        return result
-
-    def basic_join_and(self, cond, state):
-        """Default conversion of AND conditions"""
-        if self.token_separator == self.and_token:   # don't repeat the same thing triple times if separator equals and token
-            joiner = self.and_token
-        else:
-            joiner = self.token_separator + self.and_token + self.token_separator
-
-        result = joiner.join((
-                converted
-                for converted in (
-                    self.convert_condition(arg, state) if self.compare_precedence(cond, arg)
-                    else self.convert_condition_group(arg, state)
-                    for arg in cond.args
-                )
-                if converted is not None and not isinstance(converted, DeferredQueryExpression)
-            ))
-        return result
-
-    def keyword_join_or(self, cond, state):
-        pass
-
-    def keyword_join_and(self, cond, state):
-        pass
-
     def convert_condition_field_eq_val_str(self, cond : ConditionFieldEqualsValueExpression, state : ConversionState) -> Union[str, DeferredQueryExpression]:
         """Conversion of field = string value expressions"""
         field = cond.field
         val = cond.value.to_plain()
-        val_no_wc = val.rstrip("*").lstrip("*")
+        val_no_wc = val.rstrip(self.wildcard_multi).lstrip(self.wildcard_multi)
         quote = self.get_quote_type(val)
         # contains
         if val.startswith(self.wildcard_single) and val.endswith(self.wildcard_single):
@@ -144,120 +103,89 @@ class InsightIDRBackend(TextQueryBackend):
             regex=cond.value.regexp
         )
 
-    def convert_icontains_any(self, field, values):
-        """Conversion of field contains any in list conditions."""
-        result = self.field_icontains_any_expression.format(field=field,
-                                                                list=self.list_separator.join([
-                                                                    self.get_quote_type(v) + v + self.get_quote_type(v) if isinstance(v, str)
-                                                                    else str(v)
-                                                                    for v in values
-                                                                ]),
-                                                            )
+    def decide_convert_condition_as_in_expression(self, cond : Union[ConditionOR, ConditionAND], state : ConversionState) -> bool:
+        """
+        Decide if an OR or AND expression should be converted as "field in (value list) or startswith/contains any/all" or as plain expression.
+        """
+        # Check if conversion of condition type is enabled
+        if (not self.convert_or_as_in and isinstance(cond, ConditionOR)
+           or not self.convert_and_as_in and isinstance(cond, ConditionAND)):
+           return False
+        
+        # All arguments of the given condition must reference a field
+        if not all((
+            isinstance(arg, ConditionFieldEqualsValueExpression)
+            for arg in cond.args
+        )):
+            return False
 
-        return result
+        # Build a set of all fields appearing in condition arguments
+        fields = {
+            arg.field
+            for arg in cond.args
+        }
+        # All arguments must reference the same field
+        if len(fields) != 1:
+            return False
+        
+        # All argument values must be strings or numbers
+        if not all([
+            isinstance(arg.value, ( SigmaString, SigmaNumber ))
+            for arg in cond.args
+        ]):
+           return False
 
-    def convert_icontains_all(self, field, values):
-        """Conversion of field contains all in list conditions."""
-        result = self.field_icontains_all_expression.format(field=field,
-                                                                list=self.list_separator.join([
-                                                                    self.get_quote_type(v) + v + self.get_quote_type(v) if isinstance(v, str)
-                                                                    else str(v)
-                                                                    for v in values
-                                                                ]),
-                                                            )
+        # Check for plain strings if wildcards are not allowed for string expressions.
+        if not self.in_expressions_allow_wildcards and any([
+            arg.value.contains_special()
+            for arg in cond.args
+            if isinstance(arg.value, SigmaString)
+        ]):
+           return False
 
-        return result
+        # All arguments must have the same modifier - use the wildcards to confirm this
+        vals = [str(arg.value.to_plain() or "") for arg in cond.args]
+        first_char = [char for char in "".join([val[0] for val in vals])]
+        last_char = [char for char in "".join([val[-1] for val in vals])]
+        # check for all-wildcard first character and mixed-wildcard last character
+        if all([char == self.wildcard_multi for char in first_char]) and self.wildcard_multi in last_char and not all([char == self.wildcard_multi for char in last_char]):
+            return False
+        # check for all-wildcard last character and mixed-wildcard first character
+        if all([char == self.wildcard_multi for char in last_char]) and self.wildcard_multi in first_char and not all([char == self.wildcard_multi for char in first_char]):
+            return False
+        
+        # All checks passed, expression can be converted to in-expression
+        return True
 
-    def convert_istarts_with_any(self, field, values):
-        """Conversion of field starts with any in list conditions."""
-        result = self.field_istarts_with_any_expression.format(field=field,
-                                                                list=self.list_separator.join([
-                                                                    self.get_quote_type(v) + v + self.get_quote_type(v) if isinstance(v, str)
-                                                                    else str(v)
-                                                                    for v in values
-                                                                ]),
-                                                            )
+    def convert_condition_as_in_expression(self, cond : Union[ConditionOR, ConditionAND], state : ConversionState) -> Union[str, DeferredQueryExpression]:
+        """Conversion of field in value list conditions."""
+        vals = [str(arg.value.to_plain() or "") for arg in cond.args]
+        test_val = vals[0]
+        vals_no_wc = [val.rstrip(self.wildcard_multi).lstrip(self.wildcard_multi) for val in vals]
+        vals_formatted = self.list_separator.join([self.get_quote_type(v) + v + self.get_quote_type(v) if isinstance(v, str) else str(v) for v in vals_no_wc])
+        field=cond.args[0].field
 
-        return result
-
-    def convert_condition_or(self, cond : ConditionOR, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        """Conversion of OR conditions."""
-        # child args all contain values that are strings or numbers
-        if all(["value" in vars(arg).keys() for arg in cond.args]) and all([isinstance(arg.value, (SigmaString, SigmaNumber)) for arg in cond.args]):
-            args = cond.args
-            mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
-            # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
-            if all(mod == mods[0] for mod in mods) and all(["field" in vars(arg).keys() for arg in cond.args]):
-                vals = [str(arg.value.to_plain() or "") for arg in cond.args]
-                vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]
-                fields = list(set([arg.field for arg in cond.args]))
-                if len(fields) == 1:    # only one field name across all ORed items.
-                    # icontains-any
-                    if vals[0].startswith(self.wildcard_single) and vals[0].endswith(self.wildcard_single):
-                        result = self.convert_icontains_any(fields[0], vals_no_wc)
-                        return result
-                    # startswith-any
-                    elif vals[0].endswith(self.wildcard_single) and not vals[0].startswith(self.wildcard_single):
-                        result = self.convert_istarts_with_any(fields[0], vals_no_wc)
-                        return result
-                    # endswith-any
-                    elif vals[0].startswith(self.wildcard_single) and not vals[0].endswith(self.wildcard_single):
-                        field = fields[0]
-                        escaped_vals = [re.escape(val).replace("/", "\\/") for val in vals_no_wc]
-                        exp = "(.*{}$)".format("$|.*".join(escaped_vals))
-                        result = self.re_expression.format(field=field, regex=exp)
-                        return result
-                    else:
-                        return self.field_in_list_expression.format(
-                            field=fields[0],
-                            list=self.list_separator.join([
-                                self.get_quote_type(self.convert_value_str(arg.value, state)) + arg.value.to_plain() + self.get_quote_type(self.convert_value_str(arg.value, state))
-                                if isinstance(arg.value, SigmaString)   # string escaping and qouting
-                                else str(arg.value)       # value is number
-                                for arg in cond.args
-                            ]),
-                        )
-                else:
-                    # 'OR' fields differ
-                    return self.basic_join_or(cond, state)
-            # args have different modifiers
+        # or-in condition
+        if isinstance(cond, ConditionOR):
+            # contains-any
+            if test_val.startswith(self.wildcard_single) and test_val.endswith(self.wildcard_single):
+                result = self.icontains_any_expression.format(field=field, list=vals_formatted)
+            # startswith-any
+            elif test_val.endswith(self.wildcard_single) and not test_val.startswith(self.wildcard_single):
+                result = self.istartswith_any_expression.format(field=field, list=vals_formatted)
+            # endswith-any
+            elif test_val.startswith(self.wildcard_single) and not test_val.endswith(self.wildcard_single):
+                escaped_vals = [re.escape(val).replace("/", "\\/") for val in vals_no_wc]
+                exp = "(.*{}$)".format("$|.*".join(escaped_vals))
+                result = self.re_expression.format(field=field, regex=exp)
+            # iin
             else:
-                return self.basic_join_or(cond, state)
-        # child args are other 'OR' or 'AND' expressions
+                result = self.field_in_list_expression.format(field=field, list=vals_formatted)
+        # contains-all
         else:
-            return self.basic_join_or(cond, state)
+            result = self.icontains_all_expression.format(field=field, list=vals_formatted)
 
-    def convert_condition_and(self, cond : ConditionAND, state : ConversionState) -> Union[str, DeferredQueryExpression]:
-        """Conversion of AND conditions."""
-        # child args all contain values
-        if all(["value" in vars(arg).keys() for arg in cond.args]) and all([isinstance(arg.value, (SigmaString, SigmaNumber)) for arg in cond.args]):
-            args = cond.args
-            mods = [mod for mod in [arg.parent.parent.detection_items[0].modifiers for arg in args]]
-            # check whether all args have the same modifiers and relate to a named field (as opposed to keyword search)
-            if all(mod == mods[0] for mod in mods) and all(["field" in vars(arg).keys() for arg in cond.args]):
-                vals = [str(arg.value.to_plain() or "") for arg in cond.args]
-                vals_no_wc = [val.rstrip("*").lstrip("*") for val in vals]
-                fields = list(set([arg.field for arg in cond.args]))
-                # parent condition has modifiers
-                if len(fields) == 1:
-                    try:
-                        # icontains-all (last condition is SigmaAllModifier or there are two values)
-                        if cond.args[0].parent.parent.detection_items[0].modifiers[-1].__name__ == "SigmaAllModifier" or len(vals) == 2:
-                            result = self.convert_icontains_all(fields[0], vals_no_wc)
-                            return result
-                        else:
-                            return self.basic_join_and(cond, state)
-                    except:
-                        return self.basic_join_and(cond, state)
-                else:
-                    # parent condition does not contain modifiers
-                    return self.basic_join_and(cond, state)
-            # args have different modifiers
-            else:
-                return self.basic_join_and(cond, state)
-        # child args are other 'OR' or 'AND' expressions
-        else:
-            return self.basic_join_and(cond, state)
+        return result
 
     # finalize query for use with log search 'Advanced' option
     def finalize_query_leql_advanced_search(self, rule: SigmaRule, query: str, index: int, state: ConversionState) -> str:

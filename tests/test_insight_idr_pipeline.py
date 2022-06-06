@@ -1,7 +1,6 @@
 import pytest
 from sigma.collection import SigmaCollection
 from sigma.exceptions import SigmaTransformationError
-#from sigma.pipelines.insight_idr import insight_idr_pipeline
 from sigma.backends.insight_idr import InsightIDRBackend
 
 def test_insight_idr_pipeline_simple():
