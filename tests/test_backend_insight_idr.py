@@ -21,6 +21,36 @@ def test_insight_idr_simple_eq_nocase_query(insight_idr_backend : InsightIDRBack
             """)
         ) == ['field = NOCASE("foo")']
 
+def test_insight_idr_single_quote(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: process_creation
+                    product: windows
+                detection:
+                    selection:
+                        field: fo"o
+                    condition: selection
+            """)
+        ) == ['field = NOCASE(\'fo"o\')']
+
+def test_insight_idr_triple_quote(insight_idr_backend : InsightIDRBackend):
+    assert insight_idr_backend.convert(
+            SigmaCollection.from_yaml("""
+                title: Test
+                status: test
+                logsource:
+                    category: process_creation
+                    product: windows
+                detection:
+                    selection:
+                        field: fo'"o
+                    condition: selection
+            """)
+        ) == ['field = NOCASE("""fo\'"o""")']
+
 def test_insight_idr_leql_advanced_search_output_format(insight_idr_backend : InsightIDRBackend):
     assert insight_idr_backend.convert(
             SigmaCollection.from_yaml("""
@@ -70,7 +100,7 @@ def test_insight_idr_not_condition_query(insight_idr_backend : InsightIDRBackend
                     selection:
                         field: foo
                     filter:
-                        field: blah 
+                        field: blah
                     condition: selection and not filter
             """)
         ) == ['field = NOCASE("foo") AND NOT field = NOCASE("blah")']
