@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pysigma-backend-insightidr"
-version = "0.1.6"
+version = "0.1.7"
 description = "pySigma Rapid7 InsightIDR backend"
 authors = ["Micah Babinski <m.babinski.88@gmail.com>"]
 license = "LGPL-2.1-only"
@@ -11,7 +11,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.8"
-pysigma = "^0.6.2"
+pysigma = "^0.7.2"
 
 [tool.poetry.dev-dependencies]
 pytest = "^7.1.1"

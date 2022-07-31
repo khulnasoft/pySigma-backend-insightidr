@@ -17,7 +17,7 @@ class InsightIDRBackend(TextQueryBackend):
     convert_or_as_in : ClassVar[bool] = True                     # Convert OR as in-expression
     convert_and_as_in : ClassVar[bool] = True                    # Convert AND as in-expression
     in_expressions_allow_wildcards : ClassVar[bool] = True       # Values in list can contain wildcards. If set to False (default) only plain values are converted into in-expressions.
-    
+
     group_expression : ClassVar[str] = "({expr})"
 
     or_token : ClassVar[str] = "OR"
@@ -28,7 +28,7 @@ class InsightIDRBackend(TextQueryBackend):
     icontains_token: ClassVar[str] = "ICONTAINS"
     istarts_with_token: ClassVar[str] = "ISTARTS-WITH"
 
-    str_quote : ClassVar[str] = '"'
+    str_double_quote : ClassVar[str] = '"'
     str_single_quote : ClassVar[str] = "'"
     str_triple_quote : ClassVar[str] = '"""'
     escape_char : ClassVar[str] = "\\"
@@ -50,7 +50,7 @@ class InsightIDRBackend(TextQueryBackend):
     }
 
     field_null_expression : ClassVar[str] = "{field} = null"
-    
+
     field_in_list_expression : ClassVar[str] = "{field} IIN [{list}]"
     icontains_any_expression : ClassVar[Optional[str]] = "{field} ICONTAINS-ANY [{list}]"
     icontains_all_expression : ClassVar[Optional[str]] = "{field} ICONTAINS-ALL [{list}]"
@@ -69,7 +69,7 @@ class InsightIDRBackend(TextQueryBackend):
         elif '"' in string_val:
             quote = self.str_single_quote
         else:
-            quote = self.str_quote
+            quote = self.str_double_quote
 
         return quote
 
@@ -111,7 +111,7 @@ class InsightIDRBackend(TextQueryBackend):
         if (not self.convert_or_as_in and isinstance(cond, ConditionOR)
            or not self.convert_and_as_in and isinstance(cond, ConditionAND)):
            return False
-        
+
         # All arguments of the given condition must reference a field
         if not all((
             isinstance(arg, ConditionFieldEqualsValueExpression)
@@ -127,7 +127,7 @@ class InsightIDRBackend(TextQueryBackend):
         # All arguments must reference the same field
         if len(fields) != 1:
             return False
-        
+
         # All argument values must be strings or numbers
         if not all([
             isinstance(arg.value, ( SigmaString, SigmaNumber ))
@@ -153,7 +153,7 @@ class InsightIDRBackend(TextQueryBackend):
         # check for all-wildcard last character and mixed-wildcard first character
         if all([char == self.wildcard_multi for char in last_char]) and self.wildcard_multi in first_char and not all([char == self.wildcard_multi for char in first_char]):
             return False
-        
+
         # All checks passed, expression can be converted to in-expression
         return True
 
