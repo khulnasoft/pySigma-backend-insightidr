@@ -68,7 +68,7 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     logsource_windows_process_creation()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "CurrentDirectory",
@@ -115,7 +115,7 @@ def insight_idr_pipeline():
                     logsource_windows_dns_query(),
                     logsource_generic_dns_query()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "ProcessId",
@@ -139,7 +139,7 @@ def insight_idr_pipeline():
                     logsource_generic_dns_query()
                 ]
             ),
-            
+
             # Web Proxy field mapping
             ProcessingItem(
                 identifier="insight_idr_web_proxy_fieldmapping",
@@ -166,7 +166,7 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     logsource_web_proxy()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "c-uri-extension",
