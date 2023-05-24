@@ -82,7 +82,7 @@ def test_insight_idr_leql_detection_definition_output_format(insight_idr_backend
             """),
             output_format="leql_detection_definition"
         ) == ["""from(
-  entry_type = process_start_event"
+  entry_type = "process_start_event"
 )
 where(
   field = NOCASE("foo")

@@ -196,7 +196,7 @@ class InsightIDRBackend(TextQueryBackend):
         entry_type = rule.logsource.category
         formatted_query = "\n  ".join(re.split("(AND |OR )", query))
         return f"""from(
-  entry_type = {entry_type}"
+  entry_type = "{entry_type}"
 )
 where(
   {formatted_query}
