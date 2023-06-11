@@ -11,6 +11,15 @@ from typing import Union, ClassVar, Optional, Tuple, List, Dict, Any
 
 class InsightIDRBackend(TextQueryBackend):
     """InsightIDR LEQL backend."""
+    name : ClassVar[str] = "Rapid7 InsightIDR Log Entry Query Language (LEQL) Queries"
+    formats : ClassVar[Dict[str, str]] = {
+        "default": "Simple log search query mode",
+        "leql_advanced_search": "Advanced Log Entry Query Language (LEQL) queries",
+        "leql_detection_definition": "LEQL format roughly matching the 'Rule Logic' tab in ABA detection rule definition"
+    }
+    requires_pipeline : ClassVar[bool] = True
+
+    # built-in pipeline
     backend_processing_pipeline : ClassVar[ProcessingPipeline] = insight_idr_pipeline()
 
     # in-expressions
