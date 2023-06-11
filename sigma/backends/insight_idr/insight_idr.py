@@ -17,7 +17,7 @@ class InsightIDRBackend(TextQueryBackend):
         "leql_advanced_search": "Advanced Log Entry Query Language (LEQL) queries",
         "leql_detection_definition": "LEQL format roughly matching the 'Rule Logic' tab in ABA detection rule definition"
     }
-    requires_pipeline : ClassVar[bool] = True
+    requires_pipeline : ClassVar[bool] = False
 
     # built-in pipeline
     backend_processing_pipeline : ClassVar[ProcessingPipeline] = insight_idr_pipeline()
