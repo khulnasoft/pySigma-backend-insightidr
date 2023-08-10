@@ -19,6 +19,12 @@ def logsource_firewall() -> LogsourceCondition:
         category="firewall"
     )
 
+def logsource_azure_signin() -> LogsourceCondition:
+    return LogsourceCondition(
+        product="azure",
+        service="signinlogs"
+    )
+
 class AggregateRuleProcessingCondition(RuleProcessingCondition):
     """"""
     def match(self, pipeline : "sigma.processing.pipeline.ProcessingPipeline", rule : SigmaRule) -> bool:
@@ -91,7 +97,6 @@ def insight_idr_pipeline():
                     logsource_windows_process_creation(),
                 ]
             ),
-
             # DNS Request field mapping
             ProcessingItem(
                 identifier="insight_idr_dns_query_fieldmapping",
@@ -189,7 +194,7 @@ def insight_idr_pipeline():
                     logsource_web_proxy(),
                 ]
             ),
-            # Firewall - this is a placeholder. Firewall rules not yet supported :(
+            # Firewall
             ProcessingItem(
                 identifier="insight_idr_firewall_fieldmapping",
                 transformation=FieldMappingTransformation({
@@ -197,13 +202,45 @@ def insight_idr_pipeline():
                     "src_port": "source_port",
                     "dst_ip": "destination_address",
                     "dst_port": "destination_port",
-                    "username": "user"
+                    "username": "user",
+                    "action": "connection_status"
                 }),
                 rule_conditions=[
                     logsource_firewall(),
                 ]
             ),
-
+            # Ingress authentication
+            # field mapping
+            ProcessingItem(
+                identifier="insight_idr_ingress_authentication_fieldmapping",
+                transformation=FieldMappingTransformation({
+                    "ResultType": "source_json.resultType",
+                    "ResultDescription": "source_json.resultDescription",
+                    "ActivityDetails": "source_json.operationName",
+                    "ClientApp": "source_json.properties.appDisplayName",
+                    "Username": "account",
+                    "AuthenticationRequirement": "source_json.properties.authenticationRequirement",
+                    "status": "source_json.properties.status",
+                    "HomeTenantId": "source_json.properties.homeTenantId",
+                    "ResourceTenantId": "source_json.properties.resourceTenantId",
+                    "ResourceDisplayName": "authentication_target",
+                    "conditionalAccessStatus": "source_json.properties.conditionalAccessStatus",
+                    "userAgent": "user_agent"
+                }),
+                rule_conditions=[
+                    logsource_azure_signin(),
+                ]
+            ),
+            # change logsource property
+            ProcessingItem(
+                identifier="insight_idr_ingress_authentication_logsource",
+                transformation=ChangeLogsourceTransformation(
+                    category="ingress_auth"
+                ),
+                rule_conditions=[
+                    logsource_azure_signin(),
+                ]
+            ),
             # Handle unsupported log sources - here we are checking whether none of the log source-specific transformations
             # that were set above have applied and throwing a RuleFailureTransformation error if this condition is met. Otherwise,
             # a separate processing item would be needed for every unsupported log source type
@@ -215,10 +252,12 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     RuleProcessingItemAppliedCondition("insight_idr_web_proxy_logsource"),
                     RuleProcessingItemAppliedCondition("insight_idr_process_start_logsource"),
-                    RuleProcessingItemAppliedCondition("insight_idr_dns_query_logsource")
+                    RuleProcessingItemAppliedCondition("insight_idr_dns_query_logsource"),
+                    RuleProcessingItemAppliedCondition("insight_idr_firewall_fieldmapping"),
+                    RuleProcessingItemAppliedCondition("insight_idr_ingress_authentication_logsource")
                 ],
             ),
-
+            
             # Handle rules that use aggregate functions
             ProcessingItem(
                 identifier="insight_idr_fail_rule_conditions_not_supported",

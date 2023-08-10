@@ -17,6 +17,8 @@ The InsightIDR backend supports the following log entry/rule types:
 * Process start events
 * DNS query events
 * Web proxy events
+* Firewall events
+* Ingress authentication events
 
 ## Output Format Support
 It supports the following output formats which can be used for log search, custom alerts, dashboards, and reporting:
