@@ -1,7 +1,6 @@
 # pySigma InsightIDR Backend
 
 ![Tests](https://github.com/khulnasoft/pySigma-backend-insightidr/actions/workflows/test.yml/badge.svg)
-![Coverage Badge](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/thomaspatzke/059a8e802ddcf72bcc92fa60a613a8ac/raw/khulnasoft-pySigma-backend-insightidr.json)
 ![Status](https://img.shields.io/badge/Status-pre--release-orange)
 
 ## Overview
