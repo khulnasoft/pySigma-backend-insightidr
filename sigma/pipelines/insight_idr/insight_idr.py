@@ -1,7 +1,8 @@
-from sigma.processing.conditions import IncludeFieldCondition, MatchStringCondition, LogsourceCondition, RuleProcessingItemAppliedCondition
+from sigma.processing.conditions import IncludeFieldCondition, MatchStringCondition, LogsourceCondition, RuleProcessingItemAppliedCondition, RuleProcessingCondition
 from sigma.processing.pipeline import ProcessingItem, ProcessingPipeline
 from sigma.processing.transformations import ChangeLogsourceTransformation, RuleFailureTransformation, DetectionItemFailureTransformation, FieldMappingTransformation
 from sigma.pipelines.common import logsource_windows_network_connection,logsource_windows_network_connection_initiated, logsource_windows_process_creation, logsource_windows_dns_query
+from sigma.rule import SigmaRule
 
 def logsource_generic_dns_query() -> LogsourceCondition:
     return LogsourceCondition(
@@ -17,6 +18,23 @@ def logsource_firewall() -> LogsourceCondition:
     return LogsourceCondition(
         category="firewall"
     )
+
+def logsource_azure_signin() -> LogsourceCondition:
+    return LogsourceCondition(
+        product="azure",
+        service="signinlogs"
+    )
+
+class AggregateRuleProcessingCondition(RuleProcessingCondition):
+    """"""
+    def match(self, pipeline : "sigma.processing.pipeline.ProcessingPipeline", rule : SigmaRule) -> bool:
+        """Match condition on Sigma rule."""
+        agg_function_strings = ["| count", "| min", "| max", "| avg", "| sum", "| near"]
+        condition_string = " ".join([item.lower() for item in rule.detection.condition])
+        if any(f in condition_string for f in agg_function_strings):
+            return True
+        else:
+            return False
 
 
 def insight_idr_pipeline():
@@ -56,12 +74,13 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     logsource_windows_process_creation()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "CurrentDirectory",
                             "IntegrityLevel",
                             "imphash",
+                            "Imphash",
                             "LogonId"
                         ]
                     )
@@ -78,34 +97,37 @@ def insight_idr_pipeline():
                     logsource_windows_process_creation(),
                 ]
             ),
-
             # DNS Request field mapping
             ProcessingItem(
                 identifier="insight_idr_dns_query_fieldmapping",
+                rule_condition_linking=any,
                 transformation=FieldMappingTransformation({
                     "QueryName": "query",
-                    "Computer": "asset"
+                    "Computer": "asset",
+                    "record_type": "query_type"
                 }),
                 rule_conditions=[
                     logsource_windows_dns_query(),
+                    logsource_generic_dns_query()
                 ]
             ),
             # Handle unsupported DNS query fields
             ProcessingItem(
                 identifier="insight_idr_fail_dns_fields",
                 rule_condition_linking=any,
-                transformation=DetectionItemFailureTransformation("The InsightIDR backend does not support the ProcessID, QueryStatus, QueryResults, or Image fields for DNS events."),
+                transformation=DetectionItemFailureTransformation("The InsightIDR backend does not support the ProcessID, QueryStatus, QueryResults, Image, or answer fields for DNS events."),
                 rule_conditions=[
                     logsource_windows_dns_query(),
                     logsource_generic_dns_query()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "ProcessId",
                             "QueryStatus",
                             "QueryResults",
-                            "Image"
+                            "Image",
+                            "answer"
                         ]
                     )
                 ]
@@ -122,7 +144,7 @@ def insight_idr_pipeline():
                     logsource_generic_dns_query()
                 ]
             ),
-            
+
             # Web Proxy field mapping
             ProcessingItem(
                 identifier="insight_idr_web_proxy_fieldmapping",
@@ -149,7 +171,7 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     logsource_web_proxy()
                 ],
-                detection_item_conditions=[
+                field_name_conditions=[
                     IncludeFieldCondition(
                         fields=[
                             "c-uri-extension",
@@ -172,7 +194,7 @@ def insight_idr_pipeline():
                     logsource_web_proxy(),
                 ]
             ),
-            # Firewall - this is a placeholder. Firewall rules not yet supported :(
+            # Firewall
             ProcessingItem(
                 identifier="insight_idr_firewall_fieldmapping",
                 transformation=FieldMappingTransformation({
@@ -180,13 +202,45 @@ def insight_idr_pipeline():
                     "src_port": "source_port",
                     "dst_ip": "destination_address",
                     "dst_port": "destination_port",
-                    "username": "user"
+                    "username": "user",
+                    "action": "connection_status"
                 }),
                 rule_conditions=[
                     logsource_firewall(),
                 ]
             ),
-
+            # Ingress authentication
+            # field mapping
+            ProcessingItem(
+                identifier="insight_idr_ingress_authentication_fieldmapping",
+                transformation=FieldMappingTransformation({
+                    "ResultType": "source_json.resultType",
+                    "ResultDescription": "source_json.resultDescription",
+                    "ActivityDetails": "source_json.operationName",
+                    "ClientApp": "source_json.properties.appDisplayName",
+                    "Username": "account",
+                    "AuthenticationRequirement": "source_json.properties.authenticationRequirement",
+                    "status": "source_json.properties.status",
+                    "HomeTenantId": "source_json.properties.homeTenantId",
+                    "ResourceTenantId": "source_json.properties.resourceTenantId",
+                    "ResourceDisplayName": "authentication_target",
+                    "conditionalAccessStatus": "source_json.properties.conditionalAccessStatus",
+                    "userAgent": "user_agent"
+                }),
+                rule_conditions=[
+                    logsource_azure_signin(),
+                ]
+            ),
+            # change logsource property
+            ProcessingItem(
+                identifier="insight_idr_ingress_authentication_logsource",
+                transformation=ChangeLogsourceTransformation(
+                    category="ingress_auth"
+                ),
+                rule_conditions=[
+                    logsource_azure_signin(),
+                ]
+            ),
             # Handle unsupported log sources - here we are checking whether none of the log source-specific transformations
             # that were set above have applied and throwing a RuleFailureTransformation error if this condition is met. Otherwise,
             # a separate processing item would be needed for every unsupported log source type
@@ -198,7 +252,18 @@ def insight_idr_pipeline():
                 rule_conditions=[
                     RuleProcessingItemAppliedCondition("insight_idr_web_proxy_logsource"),
                     RuleProcessingItemAppliedCondition("insight_idr_process_start_logsource"),
-                    RuleProcessingItemAppliedCondition("insight_idr_dns_query_logsource")
+                    RuleProcessingItemAppliedCondition("insight_idr_dns_query_logsource"),
+                    RuleProcessingItemAppliedCondition("insight_idr_firewall_fieldmapping"),
+                    RuleProcessingItemAppliedCondition("insight_idr_ingress_authentication_logsource")
+                ],
+            ),
+            
+            # Handle rules that use aggregate functions
+            ProcessingItem(
+                identifier="insight_idr_fail_rule_conditions_not_supported",
+                transformation=RuleFailureTransformation("Rules with aggregate function conditions like count, min, max, avg, sum, and near are not supported by the InsightIDR Sigma backend!"),
+                rule_conditions=[
+                    AggregateRuleProcessingCondition()
                 ],
             )
         ]
